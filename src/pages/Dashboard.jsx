@@ -5,12 +5,15 @@ import StatCard from '../components/StatCard';
 import ScoreRing from '../components/ScoreRing';
 import EmptyState from '../components/EmptyState';
 import TagBadge from '../components/TagBadge';
-import { Users, Star, TrendingUp, Clock, LayoutDashboard } from 'lucide-react';
+import { Users, Star, TrendingUp, Clock, LayoutDashboard, Lock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { motion } from 'framer-motion';
 
 export default function Dashboard() {
     const candidates = useCandidateStore(state => state.candidates);
+    const { isAdmin, isAdminProtected } = useCandidateStore();
+
+    const isLocked = isAdminProtected && !isAdmin;
 
     if (candidates.length === 0) {
         return (
@@ -31,7 +34,7 @@ export default function Dashboard() {
 
     // Prepare data for chart
     const chartData = [...candidates].slice(-10).map((c, i) => ({
-        name: (c.name || 'Unknown').split(' ')[0], // first name
+        name: isLocked ? `Cand-${i + 1}` : (c.name || 'Unknown').split(' ')[0],
         score: c.score,
         index: i
     }));
@@ -51,11 +54,18 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="p-6 md:p-10 max-w-7xl mx-auto hidden-scrollbar">
+        <div className="p-6 md:p-10 max-w-7xl mx-auto hidden-scrollbar pb-24">
             {/* Page Header */}
-            <div className="mb-8 relative z-10">
-                <h1 className="font-syne text-3xl font-extrabold text-[var(--text-primary)] mb-2">Dashboard</h1>
-                <p className="text-[var(--text-muted)]">Platform overview & candidate metrics</p>
+            <div className="mb-8 relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="font-syne text-3xl font-extrabold text-[var(--text-primary)] mb-2">Dashboard</h1>
+                    <p className="text-[var(--text-muted)]">Platform overview & candidate metrics</p>
+                </div>
+                {isLocked && (
+                    <div className="px-4 py-2 rounded-xl bg-[rgba(255,107,107,0.1)] border border-[#FF6B6B]/30 text-[#FF6B6B] text-xs font-syne font-bold flex items-center gap-2">
+                        <Lock size={14} /> Candidate details masked (Admin Lock Active)
+                    </div>
+                )}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-[rgba(0,255,178,0.06)] blur-3xl rounded-full pointer-events-none -z-10" />
             </div>
 
@@ -116,7 +126,9 @@ export default function Dashboard() {
                                 <ScoreRing score={candidate.score} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h4 className="font-syne font-bold text-sm truncate">{candidate.name}</h4>
+                                <h4 className="font-syne font-bold text-sm truncate">
+                                    {isLocked ? `Candidate #${candidate.id?.toString().slice(-4) || (i + 1)}` : candidate.name}
+                                </h4>
                                 <p className="text-xs text-[var(--text-muted)] truncate">{candidate.role}</p>
                             </div>
                             <TagBadge label={candidate.recommendation} />

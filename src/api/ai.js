@@ -59,9 +59,10 @@ export async function callAI(systemPrompt, userContent, isJson = true) {
                     body: JSON.stringify(body),
                 });
 
-                if (res.status === 404) {
-                    console.warn(`Endpoint ${endpoint.url} returned 404. Trying next endpoint...`);
-                    // Stop model loop for this endpoint if route does not exist (404)
+                const contentType = res.headers.get('content-type') || '';
+                if (res.status === 404 || contentType.includes('text/html')) {
+                    console.warn(`Endpoint ${endpoint.url} returned ${res.status} (${contentType}). Trying next endpoint...`);
+                    // Stop model loop for this endpoint if route does not exist (404/HTML SPA fallback)
                     break;
                 }
 
