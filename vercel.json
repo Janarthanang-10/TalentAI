@@ -2,6 +2,10 @@
     "version": 2,
     "rewrites": [
         {
+            "source": "/api/groq/chat/completions",
+            "destination": "/api/groq/chat/completions"
+        },
+        {
             "source": "/api/groq/(.*)",
             "destination": "/api/groq"
         },

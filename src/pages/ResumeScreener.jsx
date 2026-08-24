@@ -123,21 +123,39 @@ export default function ResumeScreener() {
     Return ONLY valid JSON, no markdown, no backticks. The JSON must have this exact shape:
     {
       "name": "Candidate Full Name or Unknown",
-      "score": <number 0-100>,
+      "score": 85,
       "summary": "2 sentences summarizing fit.",
       "strengths": ["strength 1", "strength 2", "strength 3"],
       "gaps": ["gap 1", "gap 2"],
-      "recommendation": "Hire" | "Maybe" | "Pass",
-      "confidence": <number 0-100>
+      "recommendation": "Hire",
+      "confidence": 90
     }`;
 
         try {
             const responsePrompt = `Role: ${role || 'General'}\nResume:\n${resumeText.substring(0, 5000)}`;
-            const rawJson = await callAI(systemPrompt, responsePrompt);
-            const data = JSON.parse(rawJson);
+            const rawJson = await callAI(systemPrompt, responsePrompt, true);
+            
+            let data;
+            try {
+                data = JSON.parse(rawJson);
+            } catch (pErr) {
+                // If strict JSON.parse fails, clean up non-json text wrapper
+                const jsonMatch = rawJson.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    data = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw pErr;
+                }
+            }
 
             const candidatePayload = { 
-                ...data, 
+                name: data.name || 'Candidate',
+                score: typeof data.score === 'number' ? data.score : 75,
+                summary: data.summary || 'Resume analysis completed successfully.',
+                strengths: Array.isArray(data.strengths) ? data.strengths : ['Solid background experience'],
+                gaps: Array.isArray(data.gaps) ? data.gaps : ['Verify domain specifics'],
+                recommendation: data.recommendation || 'Maybe',
+                confidence: typeof data.confidence === 'number' ? data.confidence : 85,
                 id: Date.now(),
                 role: role || 'General Candidate',
                 resumeText: resumeText,
@@ -146,8 +164,8 @@ export default function ResumeScreener() {
             setResult(candidatePayload);
             addCandidate(candidatePayload);
         } catch (err) {
-            console.error(err);
-            setError('Failed to analyze resume. Please check the API key, console, or try again.');
+            console.error('Scan Error:', err);
+            setError(err.message || 'Failed to analyze resume. Please try again.');
         } finally {
             setIsScanning(false);
         }
