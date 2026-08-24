@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import {
     Hexagon,
@@ -11,9 +11,7 @@ import {
     Sun,
     Moon,
     Zap,
-    Users,
-    Lock,
-    Unlock
+    Users
 } from 'lucide-react';
 import { useCandidateStore } from '../store/useCandidateStore';
 
@@ -54,7 +52,6 @@ const ThemeToggle = () => {
 
 export default function Sidebar({ activeTab, setActiveTab }) {
     const candidates = useCandidateStore(state => state.candidates);
-    const { isAdmin, logoutAdmin, isAdminProtected } = useCandidateStore();
 
     return (
         <>
@@ -62,36 +59,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             <div className="hidden md:flex flex-col w-[240px] fixed left-0 top-0 bottom-0 glass-panel z-50 rounded-none border-y-0 border-l-0">
 
                 {/* Logo */}
-                <div className="flex items-center gap-3 p-6 mb-2">
+                <div className="flex items-center gap-3 p-6 mb-4">
                     <Hexagon className="text-[var(--accent-green)]" fill="currentColor" size={28} />
                     <span className="font-syne font-extrabold text-2xl tracking-tight text-[var(--text-primary)]">TalentAI</span>
                 </div>
-
-                {/* Admin Mode Badge */}
-                {isAdminProtected && (
-                    <div className="px-6 mb-3">
-                        <button
-                            onClick={() => {
-                                if (isAdmin) {
-                                    logoutAdmin();
-                                } else {
-                                    setActiveTab('candidates');
-                                }
-                            }}
-                            className={`w-full py-1.5 px-3 rounded-lg text-xs font-syne font-bold flex items-center justify-between transition-all ${
-                                isAdmin
-                                    ? 'bg-[rgba(0,255,178,0.1)] border border-[#00FFB2]/30 text-[#00FFB2] hover:bg-[rgba(0,255,178,0.2)]'
-                                    : 'bg-[rgba(255,107,107,0.1)] border border-[#FF6B6B]/30 text-[#FF6B6B] hover:bg-[rgba(255,107,107,0.2)]'
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                {isAdmin ? <Unlock size={14} /> : <Lock size={14} />}
-                                {isAdmin ? 'Admin Unlocked' : 'Admin Locked'}
-                            </span>
-                            <span className="text-[10px] opacity-70">{isAdmin ? 'Click to Lock' : 'Unlock'}</span>
-                        </button>
-                    </div>
-                )}
 
                 {/* Nav Items */}
                 <div className="flex-1 px-3 space-y-1.5 overflow-y-auto hidden-scrollbar">
