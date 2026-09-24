@@ -1,50 +1,54 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { Github, Search } from "lucide-react";
+import { motion } from "framer-motion";
 
-export default function GitHubInput({ onAnalyze, loading = false }) {
+export default function GitHubInput({ onAnalyze, loading = false, placeholder = "https://github.com/username or user/repo" }) {
   const [githubUrl, setGithubUrl] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     const url = githubUrl.trim();
-
-    if (!url) {
-      return;
-    }
-
+    if (!url) return;
     onAnalyze(url);
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-slate-900">
-          GitHub Projects
+    <div className="glass-panel p-6 rounded-2xl border border-[rgba(255,255,255,0.06)] relative overflow-hidden">
+      <div className="mb-4">
+        <h2 className="font-syne text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
+          <Github size={20} className="text-[#8B5CF6]" />
+          GitHub Repository & Profile Input
         </h2>
-
-        <p className="mt-1 text-sm text-slate-500">
-          Enter a candidate's GitHub profile to analyze their public projects.
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Enter a candidate's GitHub profile or repository to analyze public projects and code.
         </p>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
-            type="url"
+            type="text"
             value={githubUrl}
             onChange={(e) => setGithubUrl(e.target.value)}
-            placeholder="https://github.com/username"
+            placeholder={placeholder}
             disabled={loading}
-            className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
+            className="flex-1 glass-panel px-4 py-3 rounded-xl text-sm outline-none transition focus:border-[#8B5CF6] text-[var(--text-primary)] placeholder-[var(--text-dim)] disabled:opacity-50"
           />
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading || !githubUrl.trim()}
-            className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="clay-btn px-6 py-3 font-syne font-bold text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            style={{
+              background: "linear-gradient(135deg, rgba(139,92,246,0.9), rgba(88,28,135,0.9))",
+              boxShadow: "0 4px 20px rgba(139,92,246,0.3)"
+            }}
           >
+            <Search size={16} />
             {loading ? "Analyzing..." : "Analyze Projects"}
-          </button>
+          </motion.button>
         </div>
       </form>
     </div>

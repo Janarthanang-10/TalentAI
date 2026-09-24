@@ -3,7 +3,9 @@ const GITHUB_API = "https://api.github.com";
 
 function headers() {
   const h = { Accept: "application/vnd.github+json" };
-  const token = import.meta.env.VITE_GITHUB_TOKEN; // optional
+  const token = (typeof process !== "undefined" && process.env)
+    ? (process.env.VITE_GITHUB_TOKEN || process.env.GITHUB_TOKEN)
+    : "";
   if (token) h.Authorization = `Bearer ${token}`;
   return h;
 }

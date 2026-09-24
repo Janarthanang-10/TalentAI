@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles } from 'lucide-react';
+import { Send, Sparkles, Bot, Trash2, Users, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { callAI } from '../api/ai';
 import { useCandidateStore } from '../store/useCandidateStore';
 
-const SUGGESTIONS = [
-    "Who is the best candidate?",
-    "Draft an offer letter",
-    "Summarize all candidates",
-    "Write a rejection email"
+const QUICK_PROMPTS = [
+    { label: "Top Candidate", prompt: "Who is the best candidate and why?" },
+    { label: "Summarize All", prompt: "Summarize all candidates in my database." },
+    { label: "Offer Letter", prompt: "Draft a formal offer letter for the highest scored candidate." },
+    { label: "Rejection Email", prompt: "Draft a polite and constructive candidate rejection email." },
+    { label: "Interview Questions", prompt: "Suggest key technical interview questions for our top candidate." },
+    { label: "Compare Scores", prompt: "Compare candidate scores and highlight their strengths and gaps." }
 ];
 
 const TypingIndicator = () => (
@@ -30,6 +32,7 @@ export default function HRCopilot() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [copiedId, setCopiedId] = useState(null);
     const scrollRef = useRef(null);
 
     useEffect(() => {
@@ -38,8 +41,15 @@ export default function HRCopilot() {
         }
     }, [messages, isTyping]);
 
-    const handleSend = async (text = input) => {
-        if (!text.trim()) return;
+    const handleCopy = (id, text) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const handleSend = async (textToSend) => {
+        const text = (typeof textToSend === 'string' ? textToSend : input).trim();
+        if (!text) return;
 
         const newMsg = { id: Date.now(), role: 'user', content: text };
         const updatedMessages = [...messages, newMsg];
@@ -48,20 +58,44 @@ export default function HRCopilot() {
         setIsTyping(true);
 
         const stringifiedContext = candidates.length
-            ? JSON.stringify(candidates.map(c => ({ name: c.name, role: c.role, score: c.score, rec: c.recommendation, strengths: c.strengths, gaps: c.gaps })))
-            : "No candidates screened yet.";
+            ? JSON.stringify(candidates.map(c => ({
+                name: c.name,
+                role: c.role,
+                score: c.score,
+                rec: c.recommendation,
+                strengths: c.strengths,
+                gaps: c.gaps,
+                summary: c.summary
+            })))
+            : "No candidates screened yet in database.";
 
-        const systemPrompt = `You are an expert HR Copilot assistant. You help recruiters analyze candidates, draft emails, and make hiring decisions. Respond in helpful, concise markdown. Here is the current candidate context:\n${stringifiedContext}`;
+        const systemPrompt = `You are an expert HR Copilot assistant and technical recruiter.
+You help hiring managers review candidates, compare profiles, draft personalized candidate correspondence (offer letters, rejection emails), and recommend next interview steps.
+Respond in clear, structured, professional Markdown.
 
-        const conversationHistory = updatedMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n');
-        const finalPrompt = `Conversation History:\n${conversationHistory}\n\nPlease respond to the user's last message.`;
+Current Candidate Database Context:
+${stringifiedContext}`;
+
+        const conversationHistory = updatedMessages
+            .slice(-6)
+            .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+            .join('\n\n');
+
+        const finalPrompt = `Conversation History:\n${conversationHistory}\n\nPlease respond to the user's latest query directly and helpfully based on the candidate database.`;
 
         try {
             const resp = await callAI(systemPrompt, finalPrompt, false);
             setMessages([...updatedMessages, { id: Date.now() + 1, role: 'assistant', content: resp }]);
         } catch (err) {
             console.error("HRCopilot AI Error:", err);
-            setMessages([...updatedMessages, { id: Date.now() + 1, role: 'assistant', content: '_I\'m having trouble connecting to the AI brain right now. Please ensure your Groq API key is valid in the .env file._' }]);
+            setMessages([
+                ...updatedMessages,
+                {
+                    id: Date.now() + 1,
+                    role: 'assistant',
+                    content: `### Copilot Notice\n\nI encountered an issue connecting to the AI inference service (${err.message}).\n\nIf you want cloud model inference, you can configure your Groq API key in **Settings**. In the meantime, I'm ready to answer any questions about your screened candidates!`
+                }
+            ]);
         } finally {
             setIsTyping(false);
         }
@@ -74,41 +108,76 @@ export default function HRCopilot() {
         }
     };
 
+    const handleClearChat = () => {
+        if (messages.length === 0) return;
+        setMessages([]);
+    };
+
     return (
         <div className="p-4 md:p-8 max-w-4xl mx-auto h-[calc(100vh-80px)] md:h-screen flex flex-col hidden-scrollbar pb-20 md:pb-8">
             {/* Header */}
-            <div className="mb-6 shrink-0 relative z-10">
-                <h1 className="font-syne text-3xl font-extrabold text-[var(--text-primary)] mb-1 flex items-center gap-3">
-                    HR Copilot <Sparkles className="text-[#F472B6]" size={24} />
-                </h1>
-                <p className="text-[var(--text-muted)]">Your AI recruiting assistant</p>
+            <div className="mb-4 shrink-0 relative z-10 flex items-center justify-between">
+                <div>
+                    <h1 className="font-syne text-3xl font-extrabold text-[var(--text-primary)] mb-1 flex items-center gap-3">
+                        HR Copilot <Sparkles className="text-[#F472B6]" size={24} />
+                    </h1>
+                    <p className="text-[var(--text-muted)] text-xs md:text-sm">
+                        AI recruitment assistant tailored to your candidate pipeline
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <div className="glass-panel px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <Users size={14} className="text-[#F472B6]" />
+                        <span className="font-medium text-[var(--text-primary)]">{candidates.length}</span>
+                        <span className="hidden sm:inline">in database</span>
+                    </div>
+
+                    {messages.length > 0 && (
+                        <button
+                            onClick={handleClearChat}
+                            className="glass-panel p-2 rounded-xl text-[var(--text-dim)] hover:text-red-400 hover:border-red-400/30 transition-colors"
+                            title="Clear conversation"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
+                </div>
+
                 <div className="absolute top-0 right-10 w-48 h-48 bg-[rgba(244,114,182,0.06)] blur-3xl rounded-full pointer-events-none -z-10" />
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 glass-panel rounded-3xl flex flex-col overflow-hidden relative border-[rgba(244,114,182,0.1)] shadow-[0_8px_32px_rgba(244,114,182,0.05)]">
+            <div className="flex-1 glass-panel rounded-3xl flex flex-col overflow-hidden relative border-[rgba(244,114,182,0.15)] shadow-[0_8px_32px_rgba(244,114,182,0.05)]">
 
                 {/* Messages Scroll View */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 hidden-scrollbar custom-scrollbar w-full max-w-[560px] mx-auto">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 hidden-scrollbar custom-scrollbar w-full max-w-2xl mx-auto">
                     {messages.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center pt-10">
-                            <div className="w-16 h-16 rounded-full glass-panel flex items-center justify-center text-[#F472B6] mb-6 animate-float shadow-[0_0_30px_rgba(244,114,182,0.2)]">
+                        <div className="h-full flex flex-col items-center justify-center py-8">
+                            <div className="w-16 h-16 rounded-full glass-panel flex items-center justify-center text-[#F472B6] mb-4 animate-float shadow-[0_0_30px_rgba(244,114,182,0.2)]">
                                 <Bot size={32} />
                             </div>
-                            <h3 className="font-syne text-xl font-bold text-[var(--text-primary)] mb-8 text-center">How can I help you today?</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                                {SUGGESTIONS.map((sug, i) => (
+                            <h3 className="font-syne text-xl font-bold text-[var(--text-primary)] mb-2 text-center">
+                                How can I assist your hiring today?
+                            </h3>
+                            <p className="text-xs text-[var(--text-muted)] text-center max-w-sm mb-6">
+                                Ask about candidate fit, compare scores, draft custom offer letters, or generate interview questions.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                                {QUICK_PROMPTS.map((item, i) => (
                                     <motion.button
                                         key={i}
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.1 * i }}
+                                        transition={{ delay: 0.05 * i }}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        onClick={() => handleSend(sug)}
-                                        className="glass-panel py-3 px-4 rounded-xl text-sm text-[var(--text-primary)] hover:border-[#F472B6] hover:bg-[rgba(244,114,182,0.05)] transition-all text-left"
+                                        onClick={() => handleSend(item.prompt)}
+                                        className="glass-panel py-3 px-4 rounded-xl text-xs text-[var(--text-primary)] hover:border-[#F472B6] hover:bg-[rgba(244,114,182,0.06)] transition-all text-left flex flex-col gap-0.5"
                                     >
-                                        {sug}
+                                        <span className="font-bold text-[#F472B6]">{item.label}</span>
+                                        <span className="text-[var(--text-muted)] line-clamp-1">{item.prompt}</span>
                                     </motion.button>
                                 ))}
                             </div>
@@ -123,25 +192,43 @@ export default function HRCopilot() {
                                     className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                                 >
                                     {msg.role === 'assistant' && (
-                                        <span className="font-syne font-bold text-[10px] text-[#F472B6] mb-1 tracking-widest uppercase ml-1">
-                                            ✦ Copilot
-                                        </span>
+                                        <div className="flex items-center justify-between w-full max-w-[90%] mb-1 px-1">
+                                            <span className="font-syne font-bold text-[10px] text-[#F472B6] tracking-widest uppercase flex items-center gap-1">
+                                                <Sparkles size={11} /> Copilot
+                                            </span>
+                                            <button
+                                                onClick={() => handleCopy(msg.id, msg.content)}
+                                                className="text-[var(--text-dim)] hover:text-white transition-colors p-1"
+                                                title="Copy response"
+                                            >
+                                                {copiedId === msg.id ? (
+                                                    <span className="text-[#00FFB2] text-[10px] flex items-center gap-0.5 font-sans">
+                                                        <Check size={11} /> Copied
+                                                    </span>
+                                                ) : (
+                                                    <Copy size={12} />
+                                                )}
+                                            </button>
+                                        </div>
                                     )}
+
                                     <div
-                                        className={`max-w-[85%] px-5 py-3.5 ${msg.role === 'user'
-                                            ? 'clay-card rounded-2xl rounded-tr-sm bg-[rgba(244,114,182,0.12)] border border-[#F472B6]/30 text-[var(--text-primary)]'
-                                            : 'glass-panel rounded-2xl rounded-tl-sm text-[var(--text-primary)]'
+                                        className={`max-w-[90%] px-5 py-3.5 ${msg.role === 'user'
+                                            ? 'clay-card rounded-2xl rounded-tr-sm bg-[rgba(244,114,182,0.15)] border border-[#F472B6]/30 text-[var(--text-primary)]'
+                                            : 'glass-panel rounded-2xl rounded-tl-sm text-[var(--text-primary)] border border-white/5'
                                             }`}
                                     >
                                         {msg.role === 'assistant' ? (
                                             <div className="text-sm prose-invert max-w-none">
                                                 <ReactMarkdown
                                                     components={{
-                                                        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                                                        h3: ({ children }) => <h3 className="font-syne font-bold text-base text-[var(--text-primary)] mt-3 mb-2">{children}</h3>,
+                                                        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed text-[var(--text-primary)]">{children}</p>,
                                                         ul: ({ children }) => <ul className="list-disc ml-4 mb-2 space-y-1">{children}</ul>,
                                                         ol: ({ children }) => <ol className="list-decimal ml-4 mb-2 space-y-1">{children}</ol>,
-                                                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                                                        strong: ({ children }) => <strong className="font-bold text-[var(--accent-pink)]">{children}</strong>,
+                                                        li: ({ children }) => <li className="leading-relaxed text-[var(--text-muted)]">{children}</li>,
+                                                        strong: ({ children }) => <strong className="font-bold text-[var(--text-primary)]">{children}</strong>,
+                                                        code: ({ children }) => <code className="px-1.5 py-0.5 rounded bg-black/30 font-mono text-xs text-[#00FFB2]">{children}</code>,
                                                     }}
                                                 >
                                                     {msg.content}
@@ -159,8 +246,8 @@ export default function HRCopilot() {
                                     animate={{ opacity: 1, x: 0 }}
                                     className="flex flex-col items-start"
                                 >
-                                    <span className="font-syne font-bold text-[10px] text-[#F472B6] mb-1 tracking-widest uppercase ml-1">
-                                        ✦ Copilot
+                                    <span className="font-syne font-bold text-[10px] text-[#F472B6] mb-1 tracking-widest uppercase ml-1 flex items-center gap-1">
+                                        <Sparkles size={11} /> Copilot
                                     </span>
                                     <TypingIndicator />
                                 </motion.div>
@@ -169,15 +256,31 @@ export default function HRCopilot() {
                     )}
                 </div>
 
+                {/* Quick Suggestion Chips (when conversation has started) */}
+                {messages.length > 0 && (
+                    <div className="px-4 py-2 bg-[rgba(17,17,24,0.4)] border-t border-[rgba(255,255,255,0.03)] flex gap-2 overflow-x-auto hidden-scrollbar shrink-0">
+                        {QUICK_PROMPTS.map((item, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handleSend(item.prompt)}
+                                disabled={isTyping}
+                                className="px-3 py-1 rounded-full text-[11px] whitespace-nowrap glass-panel text-[var(--text-muted)] hover:text-white hover:border-[#F472B6]/40 transition-colors disabled:opacity-40"
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {/* Input Area */}
-                <div className="p-4 border-t border-[rgba(255,255,255,0.05)] bg-[rgba(17,17,24,0.6)] backdrop-blur-md shrink-0">
-                    <div className="max-w-[560px] mx-auto relative flex items-end gap-2">
+                <div className="p-4 border-t border-[rgba(255,255,255,0.05)] bg-[rgba(17,17,24,0.7)] backdrop-blur-md shrink-0">
+                    <div className="max-w-2xl mx-auto relative flex items-end gap-2">
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Ask Copilot anything..."
-                            className="w-full glass-panel pl-5 pr-12 py-4 rounded-2xl text-sm transition-all focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] focus:ring-opacity-20 outline-none resize-none hidden-scrollbar min-h-[52px] max-h-[120px]"
+                            placeholder="Ask Copilot about candidates, draft emails, compare scores..."
+                            className="w-full glass-panel pl-4 pr-12 py-3.5 rounded-2xl text-sm transition-all focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] focus:ring-opacity-20 outline-none resize-none hidden-scrollbar min-h-[50px] max-h-[120px] text-[var(--text-primary)]"
                             rows={1}
                         />
                         <motion.button
@@ -185,7 +288,8 @@ export default function HRCopilot() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleSend()}
                             disabled={!input.trim() || isTyping}
-                            className="absolute right-2 bottom-2 w-9 h-9 flex items-center justify-center rounded-xl bg-[#F472B6] text-white shadow-[0_0_15px_rgba(244,114,182,0.4)] disabled:opacity-50 disabled:shadow-none"
+                            className="absolute right-2.5 bottom-2.5 w-9 h-9 flex items-center justify-center rounded-xl bg-[#F472B6] text-white shadow-[0_0_15px_rgba(244,114,182,0.4)] disabled:opacity-50 disabled:shadow-none"
+                            title="Send message"
                         >
                             <Send size={16} className="-ml-0.5" />
                         </motion.button>
@@ -193,25 +297,5 @@ export default function HRCopilot() {
                 </div>
             </div>
         </div>
-    );
-}
-
-// Internal Bot Icon component since Lucide Bot wasn't initially imported in this file
-function Bot(props) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width={props.size || 24}
-            height={props.size || 24}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            {...props}
-        >
-            <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" />
-        </svg>
     );
 }
